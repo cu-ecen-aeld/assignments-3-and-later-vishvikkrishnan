@@ -1,4 +1,4 @@
-name: assignment-test
+name: assignment-1-test
 on: 
     push:
         tags-ignore:
