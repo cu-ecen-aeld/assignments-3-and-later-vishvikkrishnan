@@ -1,4 +1,10 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -16,7 +22,19 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
+    int status = 0;
+    if (cmd == NULL) {
+        return true;
+    }
+    status = system(cmd);
+    if (status == -1) {
+        perror("system() failed");
+        return false;
+    }
+    if (status == 127) {
+        perror("Could not execute a shell in the child process");
+        return false;
+    }
     return true;
 }
 
@@ -58,10 +76,34 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    int child_status;
+    pid_t child_pid = fork();
+    if (child_pid == -1) {
+        perror("fork() failed");
+        return false;
+    }
+
+    // Run execv() inside the child process
+    else if (child_pid == 0) {
+        if (execv(command[0], command) == -1) {
+            perror("Failed to run exec()");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Wait on child process
+    else if (waitpid(child_pid, &child_status, 0) == -1) {
+            perror("waitpid() failed!");
+            return false;
+    }
+
+    // Check exit status from the child process 
+    else if (WIFEXITED(child_status) && WEXITSTATUS(child_status) == 0) {
+        return true;
+    }
 
     va_end(args);
-
-    return true;
+    return false;
 }
 
 /**
@@ -93,7 +135,46 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
-    va_end(args);
+    int fd = open(outputfile, O_WRONLY|O_CREAT, 0644);
 
-    return true;
+    if (fd == -1) {
+        perror("Error opening file!");        
+        return false;
+    }
+    int child_pid = fork();
+    int child_status;
+
+    if (child_pid == -1) {
+        perror("fork() failed");
+        close(fd);
+        return false;
+    }
+
+    // Run execv() inside the child process
+    else if (child_pid == 0) {
+        if (dup2(fd, 1) < 0) {
+            perror("Unable to duplicate file descriptor");
+            return false;
+        }
+        close(fd);
+        child_status = execvp(command[0], command);
+        if (child_status == -1) {
+            perror("Failed to run exec()");
+            return false;
+        }
+    }
+
+    // Wait on child process
+    else if (waitpid(child_pid, &child_status, 0) == -1) {
+        perror("waitpid() error");
+        return false;
+    }
+
+    // Check exit status from the child process 
+    else if (WIFEXITED(child_status) && WEXITSTATUS(child_status) == 0) {
+        return true;
+    }
+
+    va_end(args);
+    return false;
 }
