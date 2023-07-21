@@ -12,6 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 CROSS_COMPILE=aarch64-none-linux-gnu-
+TOOLCHAIN_DIR="$(${CROSS_COMPILE}gcc --print-sysroot)"
 
 if [ $# -lt 1 ]
 then
@@ -81,10 +82,10 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
-cp $(find /home -name "ld-linux*") lib/
-cp $(find /home -name "libc.so.6") lib64/
-cp $(find /home -name "libm.so.6") lib64/
-cp $(find /home -name "libresolv.so.2") lib64/
+cp ${TOOLCHAIN_DIR}/lib/ld-linux-aarch64.so.1 lib/
+cp ${TOOLCHAIN_DIR}/lib64/libc.so.6 lib64/
+cp ${TOOLCHAIN_DIR}/lib64/libm.so.6 lib64/
+cp ${TOOLCHAIN_DIR}/lib64/libresolv.so.2 lib64/
 
 # TODO: Make device nodes
 sudo mknod -m 666 dev/null c 1 3
